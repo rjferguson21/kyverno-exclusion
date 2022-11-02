@@ -50,64 +50,45 @@ spec:
       - list: request.object.spec.[ephemeralContainers, initContainers, containers][]
         preconditions:
           all:
-          - key: "{{ request.object.spec.securityContext.runAsUser }}"
-            operator: GreaterThan
+          - key: "{{ element.name }}"
+            operator: AnyIn
+            value:
+            - not-me
+            - or-me
+            - istio-init
+        pattern:
+          =(securityContext):
+            =(runAsUser): "*"
+            =(runAsNonRoot): "*"
+      - list: request.object.spec.[ephemeralContainers, initContainers, containers][]
+        preconditions:
+          any:
+          - key: "{{ request.object.spec.securityContext.runAsUser || '0' }}"
+            operator: NotEquals
             value: 0
-          - key: "{{ element.name }}"
-            operator: AnyNotIn
-            value:
-            - not-me
-            - or-me
-            - istio-init
-        anyPattern:
-        - (securityContext):
-            =(runAsUser): "!0"
-            =(runAsNonRoot): "!false"
-      - list: request.object.spec.[ephemeralContainers, initContainers, containers][]
-        preconditions:
-          all:
-          - key: "{{ request.object.spec.securityContext.runAsUser }}"
-            operator: Equals
-            value: ""
-          - key: "{{ element.name }}"
-            operator: AnyNotIn
-            value:
-            - not-me
-            - or-me
-            - istio-init
-        anyPattern:
-        - (securityContext):
-            =(runAsUser): ">0"
-        - (securityContext):
-            =(runAsNonRoot): true
-      - list: request.object.spec.[ephemeralContainers, initContainers, containers][]
-        preconditions:
-          all:
-          - key: "{{ request.object.spec.securityContext.runAsNonRoot }}"
+          - key: "{{ request.object.spec.securityContext.runAsNonRoot || 'false' }}"
             operator: Equals
             value: true
+          all:
           - key: "{{ element.name }}"
             operator: AnyNotIn
             value:
             - not-me
             - or-me
             - istio-init
-        anyPattern:
-        - (securityContext):
-            =(runAsNonRoot): true
+        pattern:
+          =(securityContext):
             =(runAsUser): "!0"
-        - (securityContext):
             =(runAsNonRoot): "!false"
-            =(runAsUser): ">0"
       - list: request.object.spec.[ephemeralContainers, initContainers, containers][]
         preconditions:
           all:
-          - key: "{{ request.object.spec.securityContext.runAsNonRoot }}"
+          - key: "{{ request.object.spec.securityContext.runAsUser || '0' }}"
+            operator: Equals
+            value: 0
+          - key: "{{ request.object.spec.securityContext.runAsNonRoot || 'false' }}"
             operator: NotEquals
             value: true
-          - key: "{{ request.object.spec.securityContext.runAsUser }}"
-            operator: AnyIn
-            value: ["", 0]
           - key: "{{ element.name }}"
             operator: AnyNotIn
             value:
