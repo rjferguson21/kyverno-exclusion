@@ -1,0 +1,416 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: grafana
+  namespace: monitoring
+spec:
+  automountServiceAccountToken: true
+  containers:
+  - name: istio-proxy
+    args:
+    - proxy
+    - sidecar
+    - --domain
+    - $(POD_NAMESPACE).svc.cluster.local
+    - --proxyLogLevel=warning
+    - --proxyComponentLogLevel=misc:error
+    - --log_output_level=default:info
+    - --concurrency
+    - "2"
+    image: registry1.dso.mil/ironbank/opensource/istio/proxyv2:1.15.0
+    imagePullPolicy: IfNotPresent
+    lifecycle:
+      postStart:
+        exec:
+          command:
+          - pilot-agent
+          - wait
+    resources:
+      limits:
+        cpu: 100m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+      privileged: false
+      readOnlyRootFilesystem: true
+      runAsGroup: 1337
+      runAsNonRoot: true
+      runAsUser: 1337
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+  - name: grafana-sc-dashboard
+    image: registry1.dso.mil/ironbank/kiwigrid/k8s-sidecar:1.19.5
+    imagePullPolicy: IfNotPresent
+    resources:
+      limits:
+        cpu: 100m
+        memory: 100Mi
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    securityContext:
+      capabilities:
+        drop:
+        - ALL
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /tmp/dashboards
+      name: sc-dashboard-volume
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-jfjg8
+      readOnly: true
+  - env:
+    - name: METHOD
+      value: WATCH
+    - name: LABEL
+      value: grafana_datasource
+    - name: LABEL_VALUE
+      value: "1"
+    - name: FOLDER
+      value: /etc/grafana/provisioning/datasources
+    - name: RESOURCE
+      value: both
+    - name: REQ_USERNAME
+      valueFrom:
+        secretKeyRef:
+          key: admin-user
+          name: monitoring-monitoring-grafana
+    - name: REQ_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          key: admin-password
+          name: monitoring-monitoring-grafana
+    - name: REQ_URL
+      value: http://localhost:3000/api/admin/provisioning/datasources/reload
+    - name: REQ_METHOD
+      value: POST
+    image: registry1.dso.mil/ironbank/kiwigrid/k8s-sidecar:1.19.5
+    imagePullPolicy: IfNotPresent
+    name: grafana-sc-datasources
+    resources:
+      limits:
+        cpu: 100m
+        memory: 100Mi
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    securityContext:
+      capabilities:
+        drop:
+        - ALL
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /etc/grafana/provisioning/datasources
+      name: sc-datasources-volume
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-jfjg8
+      readOnly: true
+  - env:
+    - name: GF_SECURITY_ADMIN_USER
+      valueFrom:
+        secretKeyRef:
+          key: admin-user
+          name: monitoring-monitoring-grafana
+    - name: GF_SECURITY_ADMIN_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          key: admin-password
+          name: monitoring-monitoring-grafana
+    - name: GF_PATHS_DATA
+      value: /var/lib/grafana/
+    - name: GF_PATHS_LOGS
+      value: /var/log/grafana
+    - name: GF_PATHS_PLUGINS
+      value: /var/lib/grafana/plugins
+    - name: GF_PATHS_PROVISIONING
+      value: /etc/grafana/provisioning
+    image: registry1.dso.mil/ironbank/big-bang/grafana/grafana-plugins:9.2.0
+    imagePullPolicy: IfNotPresent
+    livenessProbe:
+      failureThreshold: 10
+      httpGet:
+        path: /app-health/grafana/livez
+        port: 15020
+        scheme: HTTP
+      initialDelaySeconds: 60
+      periodSeconds: 10
+      successThreshold: 1
+      timeoutSeconds: 30
+    name: grafana
+    ports:
+    - containerPort: 3000
+      name: grafana
+      protocol: TCP
+    readinessProbe:
+      failureThreshold: 3
+      httpGet:
+        path: /app-health/grafana/readyz
+        port: 15020
+        scheme: HTTP
+      periodSeconds: 10
+      successThreshold: 1
+      timeoutSeconds: 1
+    resources:
+      limits:
+        cpu: 100m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+    securityContext:
+      capabilities:
+        drop:
+        - ALL
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /etc/grafana/grafana.ini
+      name: config
+      subPath: grafana.ini
+    - mountPath: /var/lib/grafana
+      name: storage
+    - mountPath: /tmp/dashboards
+      name: sc-dashboard-volume
+    - mountPath: /etc/grafana/provisioning/dashboards/sc-dashboardproviders.yaml
+      name: sc-dashboard-provider
+      subPath: provider.yaml
+    - mountPath: /etc/grafana/provisioning/datasources
+      name: sc-datasources-volume
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-jfjg8
+      readOnly: true
+  dnsPolicy: ClusterFirst
+  enableServiceLinks: true
+  imagePullSecrets:
+  - name: private-registry
+  initContainers:
+  - args:
+    - istio-iptables
+    - -p
+    - "15001"
+    - -z
+    - "15006"
+    - -u
+    - "1337"
+    - -m
+    - REDIRECT
+    - -i
+    - '*'
+    - -x
+    - ""
+    - -b
+    - '*'
+    - -d
+    - 15090,15021,15020
+    - --log_output_level=default:info
+    image: registry1.dso.mil/ironbank/opensource/istio/proxyv2:1.15.0
+    imagePullPolicy: IfNotPresent
+    name: istio-init
+    resources:
+      limits:
+        cpu: 100m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        add:
+        - NET_ADMIN
+        - NET_RAW
+        drop:
+        - ALL
+      privileged: false
+      readOnlyRootFilesystem: false
+      runAsGroup: 0
+      runAsNonRoot: false
+      runAsUser: 0
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-jfjg8
+      readOnly: true
+  nodeName: k3d-kyverno-policies-server-0
+  preemptionPolicy: PreemptLowerPriority
+  priority: 0
+  restartPolicy: Always
+  schedulerName: default-scheduler
+  securityContext:
+    fsGroup: 472
+    runAsGroup: 472
+    runAsUser: 472
+  serviceAccount: monitoring-monitoring-grafana
+  serviceAccountName: monitoring-monitoring-grafana
+  terminationGracePeriodSeconds: 30
+  tolerations:
+  - effect: NoExecute
+    key: node.kubernetes.io/not-ready
+    operator: Exists
+    tolerationSeconds: 300
+  - effect: NoExecute
+    key: node.kubernetes.io/unreachable
+    operator: Exists
+    tolerationSeconds: 300
+  volumes:
+  - emptyDir: {}
+    name: workload-socket
+  - emptyDir: {}
+    name: credential-socket
+  - emptyDir: {}
+    name: workload-certs
+  - emptyDir:
+      medium: Memory
+    name: istio-envoy
+  - emptyDir: {}
+    name: istio-data
+  - downwardAPI:
+      defaultMode: 420
+      items:
+      - fieldRef:
+          apiVersion: v1
+          fieldPath: metadata.labels
+        path: labels
+      - fieldRef:
+          apiVersion: v1
+          fieldPath: metadata.annotations
+        path: annotations
+    name: istio-podinfo
+  - name: istio-token
+    projected:
+      defaultMode: 420
+      sources:
+      - serviceAccountToken:
+          audience: istio-ca
+          expirationSeconds: 43200
+          path: istio-token
+  - configMap:
+      defaultMode: 420
+      name: istio-ca-root-cert
+    name: istiod-ca-cert
+  - configMap:
+      defaultMode: 420
+      name: monitoring-monitoring-grafana
+    name: config
+  - emptyDir: {}
+    name: storage
+  - emptyDir: {}
+    name: sc-dashboard-volume
+  - configMap:
+      defaultMode: 420
+      name: monitoring-monitoring-grafana-config-dashboards
+    name: sc-dashboard-provider
+  - emptyDir: {}
+    name: sc-datasources-volume
+  - name: kube-api-access-jfjg8
+    projected:
+      defaultMode: 420
+      sources:
+      - serviceAccountToken:
+          expirationSeconds: 3607
+          path: token
+      - configMap:
+          items:
+          - key: ca.crt
+            path: ca.crt
+          name: kube-root-ca.crt
+      - downwardAPI:
+          items:
+          - fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+            path: namespace
+status:
+  conditions:
+  - lastProbeTime: null
+    lastTransitionTime: "2022-11-02T14:08:29Z"
+    status: "True"
+    type: Initialized
+  - lastProbeTime: null
+    lastTransitionTime: "2022-11-02T14:10:17Z"
+    status: "True"
+    type: Ready
+  - lastProbeTime: null
+    lastTransitionTime: "2022-11-02T14:10:17Z"
+    status: "True"
+    type: ContainersReady
+  - lastProbeTime: null
+    lastTransitionTime: "2022-11-02T14:08:27Z"
+    status: "True"
+    type: PodScheduled
+  containerStatuses:
+  - containerID: containerd://fda577f4f24ce396b573f53633650bc725db27ab756b7856e18f487d0beaa4c9
+    image: registry1.dso.mil/ironbank/big-bang/grafana/grafana-plugins:9.2.0
+    imageID: registry1.dso.mil/ironbank/big-bang/grafana/grafana-plugins@sha256:96e936816733915a557c6d0f16530c97a0a987e2c3ce817329f38b422b07d3fe
+    lastState: {}
+    name: grafana
+    ready: true
+    restartCount: 0
+    started: true
+    state:
+      running:
+        startedAt: "2022-11-02T14:09:49Z"
+  - containerID: containerd://4ec42c61434600a5d5d4dd0d27c88fe0542dc9e35e0f1c4f4b9a2ede07953d38
+    image: registry1.dso.mil/ironbank/kiwigrid/k8s-sidecar:1.19.5
+    imageID: registry1.dso.mil/ironbank/kiwigrid/k8s-sidecar@sha256:0d5d981ce5c73a75528dc7a225441323e81abdfb407123046ece195ccc5e3cc2
+    lastState: {}
+    name: grafana-sc-dashboard
+    ready: true
+    restartCount: 0
+    started: true
+    state:
+      running:
+        startedAt: "2022-11-02T14:08:57Z"
+  - containerID: containerd://9b80d973a2866e790eab3db1d628dca7334f20cb255e77c798c8ea369835b0e3
+    image: registry1.dso.mil/ironbank/kiwigrid/k8s-sidecar:1.19.5
+    imageID: registry1.dso.mil/ironbank/kiwigrid/k8s-sidecar@sha256:0d5d981ce5c73a75528dc7a225441323e81abdfb407123046ece195ccc5e3cc2
+    lastState: {}
+    name: grafana-sc-datasources
+    ready: true
+    restartCount: 0
+    started: true
+    state:
+      running:
+        startedAt: "2022-11-02T14:08:57Z"
+  - containerID: containerd://dd46b0afc6aff2d04d574d3d7822befd8e392cf1d801f8df3296ff7d94919fc2
+    image: registry1.dso.mil/ironbank/opensource/istio/proxyv2:1.15.0
+    imageID: registry1.dso.mil/ironbank/opensource/istio/proxyv2@sha256:962501515b9fd81267c894a4d987dcd7e6f226070376a182753a68fcc91d9cda
+    lastState: {}
+    name: istio-proxy
+    ready: true
+    restartCount: 0
+    started: true
+    state:
+      running:
+        startedAt: "2022-11-02T14:08:29Z"
+  hostIP: 172.24.0.2
+  initContainerStatuses:
+  - containerID: containerd://1dd2cbab00e81b3131e0c09eb78575c588006af620a121dab3002fb45c60c420
+    image: registry1.dso.mil/ironbank/opensource/istio/proxyv2:1.15.0
+    imageID: registry1.dso.mil/ironbank/opensource/istio/proxyv2@sha256:962501515b9fd81267c894a4d987dcd7e6f226070376a182753a68fcc91d9cda
+    lastState: {}
+    name: istio-init
+    ready: true
+    restartCount: 0
+    state:
+      terminated:
+        containerID: containerd://1dd2cbab00e81b3131e0c09eb78575c588006af620a121dab3002fb45c60c420
+        exitCode: 0
+        finishedAt: "2022-11-02T14:08:28Z"
+        reason: Completed
+        startedAt: "2022-11-02T14:08:27Z"
+  phase: Running
+  podIP: 10.42.0.23
+  podIPs:
+  - ip: 10.42.0.23
+  qosClass: Guaranteed
+  startTime: "2022-11-02T14:08:27Z"

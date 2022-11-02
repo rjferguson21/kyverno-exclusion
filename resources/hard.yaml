@@ -1,0 +1,217 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: grafana
+  namespace: monitoring
+spec:
+  automountServiceAccountToken: true
+  securityContext:
+    fsGroup: 472
+    runAsGroup: 472
+    runAsUser: 472
+  containers:
+  - name: istio-proxy
+    image: registry1.dso.mil/ironbank/opensource/istio/proxyv2:1.15.0
+    imagePullPolicy: IfNotPresent
+    resources:
+      limits:
+        cpu: 100m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+    securityContext:
+      runAsGroup: 1337
+      runAsNonRoot: true
+      runAsUser: 1337
+    terminationMessagePolicy: File
+  - name: grafana-sc-dashboard
+    image: registry1.dso.mil/ironbank/kiwigrid/k8s-sidecar:1.19.5
+    imagePullPolicy: IfNotPresent
+    resources:
+      limits:
+        cpu: 100m
+        memory: 100Mi
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    securityContext:
+      capabilities:
+        drop:
+        - ALL
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /tmp/dashboards
+      name: sc-dashboard-volume
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-jfjg8
+      readOnly: true
+  - env:
+    - name: METHOD
+      value: WATCH
+    - name: LABEL
+      value: grafana_datasource
+    - name: LABEL_VALUE
+      value: "1"
+    - name: FOLDER
+      value: /etc/grafana/provisioning/datasources
+    - name: RESOURCE
+      value: both
+    - name: REQ_USERNAME
+      valueFrom:
+        secretKeyRef:
+          key: admin-user
+          name: monitoring-monitoring-grafana
+    - name: REQ_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          key: admin-password
+          name: monitoring-monitoring-grafana
+    - name: REQ_URL
+      value: http://localhost:3000/api/admin/provisioning/datasources/reload
+    - name: REQ_METHOD
+      value: POST
+    image: registry1.dso.mil/ironbank/kiwigrid/k8s-sidecar:1.19.5
+    imagePullPolicy: IfNotPresent
+    name: grafana-sc-datasources
+    resources:
+      limits:
+        cpu: 100m
+        memory: 100Mi
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    securityContext:
+      capabilities:
+        drop:
+        - ALL
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /etc/grafana/provisioning/datasources
+      name: sc-datasources-volume
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-jfjg8
+      readOnly: true
+  - env:
+    - name: GF_SECURITY_ADMIN_USER
+      valueFrom:
+        secretKeyRef:
+          key: admin-user
+          name: monitoring-monitoring-grafana
+    - name: GF_SECURITY_ADMIN_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          key: admin-password
+          name: monitoring-monitoring-grafana
+    - name: GF_PATHS_DATA
+      value: /var/lib/grafana/
+    - name: GF_PATHS_LOGS
+      value: /var/log/grafana
+    - name: GF_PATHS_PLUGINS
+      value: /var/lib/grafana/plugins
+    - name: GF_PATHS_PROVISIONING
+      value: /etc/grafana/provisioning
+    image: registry1.dso.mil/ironbank/big-bang/grafana/grafana-plugins:9.2.0
+    imagePullPolicy: IfNotPresent
+    livenessProbe:
+      failureThreshold: 10
+      httpGet:
+        path: /app-health/grafana/livez
+        port: 15020
+        scheme: HTTP
+      initialDelaySeconds: 60
+      periodSeconds: 10
+      successThreshold: 1
+      timeoutSeconds: 30
+    name: grafana
+    ports:
+    - containerPort: 3000
+      name: grafana
+      protocol: TCP
+    readinessProbe:
+      failureThreshold: 3
+      httpGet:
+        path: /app-health/grafana/readyz
+        port: 15020
+        scheme: HTTP
+      periodSeconds: 10
+      successThreshold: 1
+      timeoutSeconds: 1
+    resources:
+      limits:
+        cpu: 100m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+    securityContext:
+      capabilities:
+        drop:
+        - ALL
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /etc/grafana/grafana.ini
+      name: config
+      subPath: grafana.ini
+    - mountPath: /var/lib/grafana
+      name: storage
+    - mountPath: /tmp/dashboards
+      name: sc-dashboard-volume
+    - mountPath: /etc/grafana/provisioning/dashboards/sc-dashboardproviders.yaml
+      name: sc-dashboard-provider
+      subPath: provider.yaml
+    - mountPath: /etc/grafana/provisioning/datasources
+      name: sc-datasources-volume
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-jfjg8
+      readOnly: true
+  dnsPolicy: ClusterFirst
+  enableServiceLinks: true
+  imagePullSecrets:
+  - name: private-registry
+  initContainers:
+  - args:
+    - istio-iptables
+    - -p
+    - "15001"
+    - -z
+    - "15006"
+    - -u
+    - "1337"
+    - -m
+    - REDIRECT
+    - -i
+    - '*'
+    - -x
+    - ""
+    - -b
+    - '*'
+    - -d
+    - 15090,15021,15020
+    - --log_output_level=default:info
+    image: registry1.dso.mil/ironbank/opensource/istio/proxyv2:1.15.0
+    imagePullPolicy: IfNotPresent
+    name: istio-init
+    resources:
+      limits:
+        cpu: 100m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        add:
+        - NET_ADMIN
+        - NET_RAW
+        drop:
+        - ALL
+      privileged: false
+      readOnlyRootFilesystem: false
+      runAsGroup: 0
+      runAsNonRoot: false
+      runAsUser: 0

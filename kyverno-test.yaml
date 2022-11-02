@@ -1,0 +1,86 @@
+name: run-as-non-root
+policies:
+  # - foreach-policy.yaml
+  - negation-policy.yaml
+resources:
+  - resources/basic.yaml
+  - resources/omit-pod-basic.yaml
+  - resources/container-exclusions.yaml
+  - resources/hard.yaml
+results:
+  # Basic runAsNonRoot
+  - policy: require-non-root-user
+    rule: non-root-user
+    resource: basic-run-as-pass
+    kind: Pod
+    result: pass
+  - policy: require-non-root-user
+    rule: non-root-user
+    resource: basic-run-as-fail
+    kind: Pod
+    result: fail
+  # Basic runAsUser
+  - policy: require-non-root-user
+    rule: non-root-user
+    resource: basic-run-as-user-pass
+    kind: Pod
+    result: pass
+  - policy: require-non-root-user
+    rule: non-root-user
+    resource: basic-run-as-user-fail
+    kind: Pod
+    result: fail
+  # Omit pod spec security context basic runAsNonRoot
+  - policy: require-non-root-user
+    rule: non-root-user
+    resource: basic-omit-run-as-pass
+    kind: Pod
+    result: pass
+  - policy: require-non-root-user
+    rule: non-root-user
+    resource: basic-omit-run-as-fail
+    kind: Pod
+    result: fail
+  # Omit pod spec security context basic runAsUser
+  - policy: require-non-root-user
+    rule: non-root-user
+    resource: basic-omit-run-as-user-pass
+    kind: Pod
+    result: pass
+  - policy: require-non-root-user
+    rule: non-root-user
+    resource: basic-omit-run-as-user-fail
+    kind: Pod
+    result: fail
+  # Container Exclusions
+  - policy: require-non-root-user
+    rule: non-root-user
+    resource: require-non-root-user-istio-init-exception
+    kind: Pod
+    result: pass
+  - policy: require-non-root-user
+    rule: non-root-user
+    resource: require-non-root-user-istio-init-exception
+    kind: Pod
+    result: pass
+  - policy: require-non-root-user
+    rule: non-root-user
+    resource: require-non-root-user-istio-init-exception-omitted
+    kind: Pod
+    result: pass
+  - policy: require-non-root-user
+    rule: non-root-user
+    resource: require-non-root-user-istio-init-exception-omitted
+    kind: Pod
+    result: pass
+  - policy: require-non-root-user
+    rule: non-root-user
+    resource: require-non-root-user-istio-init-exception-fail
+    kind: Pod
+    result: fail
+  # Grafana
+  - policy: require-non-root-user
+    rule: non-root-user
+    resource: grafana
+    kind: Pod
+    result: pass
