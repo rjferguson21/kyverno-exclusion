@@ -58,3 +58,24 @@ spec:
     image: nginx
     securityContext:
       runAsNonRoot: false
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: im-stuck
+spec:
+  securityContext:
+    runAsNonRoot: true
+  containers:
+  - name: c1
+    image: nginx
+    args: ["sleep", "infinity"]
+  initContainers:
+  - name: istio-init
+    image: nginx
+    securityContext:
+      runAsNonRoot: false
+  - name: c1
+    image: nginx
+    securityContext:
+      runAsUser: 0

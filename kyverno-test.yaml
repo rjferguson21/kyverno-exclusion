@@ -7,6 +7,8 @@ resources:
   - resources/omit-pod-basic.yaml
   - resources/container-exclusions.yaml
   - resources/hard.yaml
+  - resources/kiali.yaml
+  - resources/kiali-run-as.yaml
 results:
   # Basic runAsNonRoot
   - policy: require-non-root-user
@@ -84,3 +86,39 @@ results:
     resource: grafana
     kind: Pod
     result: pass
+  # Kiali
+  - policy: require-non-root-user
+    rule: non-root-user
+    resource: kiali-container-fail-run-as
+    kind: Pod
+    result: fail
+  - policy: require-non-root-user
+    rule: non-root-user
+    resource: kiali-7fc5c8cc98-hnn66-run-as
+    kind: Pod
+    result: pass
+  - policy: require-non-root-user
+    rule: non-root-user
+    resource: kiali-container-run-as
+    kind: Pod
+    result: pass
+  - policy: require-non-root-user
+    rule: non-root-user
+    resource: kiali-container-fail
+    kind: Pod
+    result: fail
+  - policy: require-non-root-user
+    rule: non-root-user
+    resource: kiali-7fc5c8cc98-hnn66
+    kind: Pod
+    result: pass
+  - policy: require-non-root-user
+    rule: non-root-user
+    resource: kiali-container
+    kind: Pod
+    result: pass
+  - policy: require-non-root-user
+    rule: non-root-user
+    resource: im-stuck
+    kind: Pod
+    result: fail
