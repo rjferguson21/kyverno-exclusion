@@ -63,10 +63,10 @@ spec:
       - list: request.object.spec.[ephemeralContainers, initContainers, containers][]
         preconditions:
           any:
-          - key: "{{ request.object.spec.securityContext.runAsUser || '0' }}"
+          - key: "{{ request.object.spec.securityContext.runAsUser || `0` }}"
             operator: NotEquals
             value: 0
-          - key: "{{ request.object.spec.securityContext.runAsNonRoot || 'false' }}"
+          - key: "{{ request.object.spec.securityContext.runAsNonRoot || `false` }}"
             operator: Equals
             value: true
           all:
@@ -83,10 +83,10 @@ spec:
       - list: request.object.spec.[ephemeralContainers, initContainers, containers][]
         preconditions:
           all:
-          - key: "{{ request.object.spec.securityContext.runAsUser || '0' }}"
+          - key: "{{ request.object.spec.securityContext.runAsUser || `0` }}"
             operator: Equals
             value: 0
-          - key: "{{ request.object.spec.securityContext.runAsNonRoot || 'false' }}"
+          - key: "{{ request.object.spec.securityContext.runAsNonRoot || `false` }}"
             operator: NotEquals
             value: true
           - key: "{{ element.name }}"
