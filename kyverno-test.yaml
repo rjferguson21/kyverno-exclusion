@@ -1,7 +1,7 @@
 name: run-as-non-root
 policies:
-  # - foreach-policy.yaml
-  - negation-policy.yaml
+  - foreach-policy.yaml
+    # - negation-policy.yaml
 resources:
   - resources/basic.yaml
   - resources/omit-pod-basic.yaml
@@ -120,5 +120,10 @@ results:
   - policy: require-non-root-user
     rule: non-root-user
     resource: im-stuck
+    kind: Pod
+    result: fail
+  - policy: require-non-root-user
+    rule: non-root-user
+    resource: im-stuck-now
     kind: Pod
     result: fail
